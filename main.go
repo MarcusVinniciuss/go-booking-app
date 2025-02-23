@@ -2,46 +2,57 @@ package main
 
 import (
 	"fmt"
-	"strings"
+	"sync"
+	"time"
 )
 
 var conferenceName = "Go Conference"
 const conferenceTickets int = 50
 var remainingTickets uint = 50
-var bookings = []string{}
+var bookings = make([]UserData, 0)
+
+type UserData struct {
+	firstName string
+	lastName string
+	email string
+	numberOfTickets uint
+}
+
+var wg = sync.WaitGroup{}
 
 func main() {	
 	greetUsers()
 
-	for {
+	firstName, lastName, email, userTickets := getUserInput()
+	isValidName, isValidEmail, isValidTicketNumber := validateUserInput(firstName, lastName, email, userTickets)
 
-		firstName, lastName, email, userTickets := getUserInput()
-		isValidName, isValidEmail, isValidTicketNumber := validateUserInput(firstName, lastName, email, userTickets)
+	if isValidName && isValidEmail && isValidTicketNumber {
 
-		if isValidName && isValidEmail && isValidTicketNumber {
+		bookTicket(userTickets, firstName, lastName, email)
 
-			bookTicket(userTickets, firstName, lastName, email)
-			
-			firstNames := getFistNames()
-			fmt.Printf("The first names of bookings are: %v\n", firstNames)
+		wg.Add(1)
+		go sendTicket(userTickets, firstName, lastName, email)
 
-			if remainingTickets == 0 {
-				//end program
-				fmt.Println("Our conference is booked out. Come back next year.")
-				break
-			}
-		} else {
-			if !isValidName {
-				fmt.Println("Fist name or last name you entered is too shoort!")
-			}
-			if !isValidEmail {
-				fmt.Println("Number of tickets you entered doesn't contain @ sign!")
-			}
-			if !isValidTicketNumber {
-				fmt.Println("Number of ticket you entered is invalid!")
-			}
+		firstNames := getFistNames()
+		fmt.Printf("The first names of bookings are: %v\n", firstNames)
+
+		if remainingTickets == 0 {
+			//end program
+			fmt.Println("Our conference is booked out. Come back next year.")
+			//break
+		}
+	} else {
+		if !isValidName {
+			fmt.Println("Fist name or last name you entered is too shoort!")
+		}
+		if !isValidEmail {
+			fmt.Println("Number of tickets you entered doesn't contain @ sign!")
+		}
+		if !isValidTicketNumber {
+			fmt.Println("Number of ticket you entered is invalid!")
 		}
 	}
+	wg.Wait()
 }
 
 func greetUsers() {
@@ -53,18 +64,9 @@ func greetUsers() {
 func getFistNames() []string {
 	firstNames := []string{}
 	for _, booking := range bookings {
-		var names = strings.Fields(booking)
-		firstNames = append(firstNames, names[0])
+		firstNames = append(firstNames, booking.firstName)
 	}	
 	return firstNames
-}
-
-func validateUserInput(firstName string, lastName string, email string, userTickets uint) (bool, bool, bool) {
-	isValidName := len(firstName) >= 2 && len(lastName) >= 2
-	isValidEmail := strings.Contains(email, "@")
-	isValidTicketNumber := userTickets > 0 && userTickets <= remainingTickets
-	
-	return isValidName, isValidEmail, isValidTicketNumber
 }
 
 func getUserInput() (string, string, string, uint){
@@ -90,8 +92,26 @@ func getUserInput() (string, string, string, uint){
 
 func bookTicket(userTickets uint,firstName string, lastName string, email string)  {
 	remainingTickets = remainingTickets - userTickets
-	bookings = append(bookings, firstName+" "+lastName)
+	
+	var userData = UserData {
+		firstName: firstName,
+		lastName: lastName,
+		email: email,
+		numberOfTickets: userTickets,
+	}
+
+	bookings = append(bookings, userData)
+	fmt.Printf("List of bookings is %v\n", bookings)
 
 	fmt.Printf("Thank you %v %v for booking %v tickets. You will receive a confirmation email at %v\n", firstName, lastName, userTickets, email)
 	fmt.Printf("%v tickets remaining for %v\n", remainingTickets, conferenceName)
+}
+
+func sendTicket(userTickets uint, firstName string, lastName string, email string)  {
+	time.Sleep(10 * time.Second)
+	var ticket = fmt.Sprintf("%v ticket for %v %v", userTickets, firstName, lastName)
+	println("################################")
+	fmt.Printf("Sending ticket:\n %v \nto email address %v\n", ticket, email)
+	println("################################")
+	wg.Done()
 }
